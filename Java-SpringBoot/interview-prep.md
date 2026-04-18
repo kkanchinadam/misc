@@ -203,7 +203,179 @@ Use when: event systems, UI listeners, pub/sub messaging, any scenario where sta
 
 ---
 
-## 4. Spring Boot
+## 4. Dependency Injection & Autowiring
+
+**Q: What is Dependency Injection (DI)?**
+
+Dependency Injection is a design principle where an object **receives its dependencies from an external source** rather than creating them itself. Instead of writing `new ServiceImpl()` inside your class, something else (the Spring IoC container) hands the dependency in.
+
+```java
+// Without DI — tight coupling, hard to test
+public class OrderService {
+    private PaymentService paymentService = new PaymentService(); // hardcoded
+}
+
+// With DI — loose coupling, easy to swap or mock
+public class OrderService {
+    private final PaymentService paymentService;
+
+    public OrderService(PaymentService paymentService) { // injected
+        this.paymentService = paymentService;
+    }
+}
+```
+
+The Spring container manages object creation and wiring. You just declare what you need.
+
+---
+
+**Q: Why is Dependency Injection important?**
+
+- **Loose coupling** — classes don't know about each other's concrete implementations; they depend on abstractions (interfaces). Swap implementations without changing consumers.
+- **Testability** — you can inject a mock or stub during unit tests instead of the real dependency.
+- **Single Responsibility** — classes focus on their own logic, not on creating collaborators.
+- **Reusability** — the same bean can be injected wherever needed; Spring manages its lifecycle.
+- **Inversion of Control (IoC)** — control over object creation is inverted from your code to the framework. DI is the mechanism that implements IoC.
+
+Without DI, changing a dependency means hunting down every `new ConcreteImpl()` in the codebase. With DI, you change one configuration and every consumer is updated automatically.
+
+---
+
+**Q: What are the types of Dependency Injection?**
+
+Spring supports three types:
+
+### 1. Constructor Injection (recommended)
+Dependencies are passed via the constructor. With a single constructor, `@Autowired` is optional since Spring 4.3.
+
+```java
+@Service
+public class OrderService {
+    private final PaymentService paymentService;
+    private final InventoryService inventoryService;
+
+    // @Autowired optional here (single constructor)
+    public OrderService(PaymentService paymentService, InventoryService inventoryService) {
+        this.paymentService = paymentService;
+        this.inventoryService = inventoryService;
+    }
+}
+```
+
+**Why it's best:** dependencies are `final` (immutable after construction), clearly declared, and the class is impossible to instantiate without all required dependencies — making missing deps a compile-time issue, not a runtime surprise. Also easiest to unit test (just call `new` with mocks).
+
+### 2. Setter Injection
+Dependencies are injected via setter methods after object construction. Use for **optional** dependencies.
+
+```java
+@Service
+public class ReportService {
+    private NotificationService notificationService;
+
+    @Autowired(required = false)
+    public void setNotificationService(NotificationService notificationService) {
+        this.notificationService = notificationService;
+    }
+}
+```
+
+**Drawback:** the dependency is not `final` and could be null if not set, requiring null checks.
+
+### 3. Field Injection
+`@Autowired` directly on the field. Spring uses reflection to inject it.
+
+```java
+@Service
+public class UserService {
+    @Autowired
+    private UserRepository userRepository; // injected by Spring via reflection
+}
+```
+
+**Convenient but discouraged** for production code: fields can't be `final`, you can't write a plain constructor call in tests (you need a Spring context or reflection to inject), and it hides dependencies — the class's requirements aren't visible in its constructor.
+
+---
+
+**Q: What is `@Autowired` and how does it work?**
+
+`@Autowired` tells Spring to inject a matching bean from the application context into the annotated constructor, setter, or field.
+
+Spring resolves the dependency by **type first**: it looks for a bean whose type matches (or is assignable to) the declared type. If exactly one match is found, it injects it.
+
+```java
+@Service
+public class InvoiceService {
+    private final TaxCalculator taxCalculator;
+
+    @Autowired
+    public InvoiceService(TaxCalculator taxCalculator) {
+        this.taxCalculator = taxCalculator;
+    }
+}
+```
+
+**What happens if there are multiple matching beans?** Spring throws `NoUniqueBeanDefinitionException`. Resolve it with:
+
+- **`@Qualifier("beanName")`** — specify exactly which bean to inject by name.
+- **`@Primary`** — mark one bean as the default when multiple candidates exist.
+
+```java
+@Autowired
+@Qualifier("usdTaxCalculator")
+private TaxCalculator taxCalculator;
+```
+
+**`required = false`** — marks the dependency as optional. If no matching bean is found, Spring injects `null` instead of throwing an exception.
+
+```java
+@Autowired(required = false)
+private OptionalFeature optionalFeature;
+```
+
+---
+
+**Q: How does Spring decide which bean to inject? (Type vs Name resolution)**
+
+Spring's autowiring resolution order:
+1. **By type** — finds all beans assignable to the declared type.
+2. **If multiple found** — narrows by `@Qualifier` name or, if absent, by field/parameter name matching a bean name.
+3. **If `@Primary` is present on one candidate** — that one wins.
+4. **If still ambiguous** — throws `NoUniqueBeanDefinitionException`.
+
+```java
+@Component("fastEngine")
+public class FastEngine implements Engine { ... }
+
+@Component("slowEngine")
+public class SlowEngine implements Engine { ... }
+
+@Service
+public class Car {
+    @Autowired
+    @Qualifier("fastEngine")   // disambiguate
+    private Engine engine;
+}
+```
+
+---
+
+**Q: Constructor injection vs field injection — which should you use and why?**
+
+Always prefer **constructor injection** in production code:
+
+| | Constructor Injection | Field Injection |
+|---|---|---|
+| Dependencies `final` | Yes | No |
+| Visible in constructor | Yes — clear contract | No — hidden |
+| Unit testable without Spring | Yes — just `new Class(mock)` | No — need Spring context or reflection |
+| Detects circular deps | At startup | At runtime (may succeed) |
+| Recommended by Spring team | Yes | No |
+
+Field injection is fine for quick prototypes or test classes (`@MockBean` in tests), but in application code constructor injection is the standard.
+
+---
+
+## 5. Spring Boot
 
 **Q: What is Spring Boot?**
 
@@ -363,47 +535,6 @@ public class OrderService {
         // runs in a transaction
     }
 }
-```
-
----
-
-## 5. SQL
-
-**Q: What are the key SQL statements?**
-
-- **`SELECT`** — retrieve data: `SELECT name, age FROM users WHERE age > 25 ORDER BY name;`
-- **`INSERT`** — add rows: `INSERT INTO users (name, age) VALUES ('Alice', 30);`
-- **`UPDATE`** — modify rows: `UPDATE users SET age = 31 WHERE name = 'Alice';`
-- **`DELETE`** — remove rows: `DELETE FROM users WHERE age < 18;`
-- **`CREATE TABLE`** — define a new table with columns and constraints.
-- **`ALTER TABLE`** — add/modify/drop columns or constraints.
-- **`DROP TABLE`** — delete a table entirely.
-- **`GROUP BY`** — group rows for aggregate functions (`COUNT`, `SUM`, `AVG`, `MAX`, `MIN`).
-- **`HAVING`** — filter groups (like `WHERE` but applied after `GROUP BY`).
-
----
-
-**Q: What are the types of JOINs?**
-
-Assume tables `employees (id, name, dept_id)` and `departments (id, dept_name)`.
-
-| JOIN Type | Returns |
-|---|---|
-| **INNER JOIN** | Only rows with matching values in both tables. Non-matching rows are excluded. |
-| **LEFT JOIN** (LEFT OUTER) | All rows from left table + matching rows from right. Non-matching right rows → NULL. |
-| **RIGHT JOIN** (RIGHT OUTER) | All rows from right table + matching rows from left. Non-matching left rows → NULL. |
-| **FULL OUTER JOIN** | All rows from both tables. NULLs where no match on either side. |
-| **CROSS JOIN** | Cartesian product — every row from left paired with every row from right. |
-| **SELF JOIN** | A table joined with itself, using aliases. Useful for hierarchical data (e.g., employee-manager). |
-
-```sql
--- INNER JOIN: only employees who belong to a department
-SELECT e.name, d.dept_name FROM employees e
-INNER JOIN departments d ON e.dept_id = d.id;
-
--- LEFT JOIN: all employees, even if they have no department
-SELECT e.name, d.dept_name FROM employees e
-LEFT JOIN departments d ON e.dept_id = d.id;
 ```
 
 ---
