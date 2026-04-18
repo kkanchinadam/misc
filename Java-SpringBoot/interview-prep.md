@@ -86,6 +86,189 @@ An **abstract class** cannot be instantiated and may have abstract methods that 
 
 ---
 
+**Q: What exactly is an interface in Java? What can it contain?**
+
+An interface is a **contract** — it defines *what* a class can do, without specifying *how*. Any class that `implements` the interface must provide implementations for all its abstract methods (unless the class is itself abstract).
+
+Before Java 8, interfaces could only have abstract method signatures and `public static final` constants. Modern Java has expanded this significantly:
+
+```java
+public interface PaymentProcessor {
+
+    // Abstract method — every implementor must provide this
+    void process(Payment payment);
+
+    // Default method (Java 8+) — has a body, inherited unless overridden
+    default void validate(Payment payment) {
+        if (payment.getAmount() <= 0) throw new IllegalArgumentException("Invalid amount");
+    }
+
+    // Static method (Java 8+) — belongs to the interface, not the instance
+    static PaymentProcessor noOp() {
+        return payment -> {};  // factory helper
+    }
+
+    // Constant — implicitly public static final
+    int MAX_RETRY = 3;
+
+    // Private method (Java 9+) — shared helper for default methods, not exposed
+    private void log(String msg) {
+        System.out.println("[Payment] " + msg);
+    }
+}
+```
+
+A class can implement multiple interfaces — this is Java's answer to multiple inheritance:
+
+```java
+public class StripeProcessor implements PaymentProcessor, Auditable, Retryable {
+    @Override
+    public void process(Payment payment) {
+        // Stripe-specific implementation
+    }
+}
+```
+
+---
+
+**Q: What is the difference between an interface and an abstract class — and when do you choose each?**
+
+| Feature | Interface | Abstract Class |
+|---|---|---|
+| Instance fields (state) | No — only `static final` constants | Yes — can have any fields |
+| Constructor | No | Yes |
+| Method types | `abstract`, `default`, `static`, `private` | Any — abstract or concrete |
+| Multiple inheritance | Yes — a class can implement many | No — a class can extend only one |
+| Access modifiers on methods | Implicitly `public` (before Java 9) | Any modifier |
+| `IS-A` relationship | Describes a capability or role | Describes a type with shared base |
+| Instantiatable | No | No |
+
+**When to use an interface:**
+- You want to define a **capability or role** that unrelated classes can share.
+- You need **multiple inheritance** of type.
+- You want to define a **contract** that any type can fulfill, regardless of its class hierarchy.
+
+```java
+// Unrelated classes sharing a capability — interface is right
+class Dog implements Swimmable, Runnable { }
+class Boat implements Swimmable { }
+// Dog and Boat share no meaningful base class, but both can swim
+```
+
+**When to use an abstract class:**
+- You have a **family of closely related classes** that share state and behavior.
+- You want to provide a **partial implementation** that subclasses build on.
+- You need **protected or package-private** members (interfaces can't have these pre-Java 9).
+- You need a **constructor** to enforce initialization logic.
+
+```java
+abstract class Animal {
+    protected String name;   // shared state — not possible in interface
+    protected int age;
+
+    Animal(String name, int age) {   // constructor — interface can't have this
+        this.name = name;
+        this.age = age;
+    }
+
+    abstract void speak();           // each animal speaks differently
+
+    void breathe() {                 // shared behavior — all animals breathe the same way
+        System.out.println(name + " breathes");
+    }
+}
+
+class Dog extends Animal {
+    Dog(String name, int age) { super(name, age); }
+
+    @Override
+    void speak() { System.out.println(name + " barks"); }
+}
+```
+
+**The practical rule of thumb:** default to an **interface**. Switch to an abstract class only when you genuinely need shared state (instance fields) or a constructor.
+
+---
+
+**Q: How do interfaces enable polymorphism in practice? Why is this powerful?**
+
+The real power of interfaces is that code depending on an interface doesn't care what the concrete type is — you can swap implementations without changing the consumer.
+
+```java
+// Define the contract
+public interface NotificationService {
+    void send(String recipient, String message);
+}
+
+// Multiple implementations
+@Service("emailNotification")
+public class EmailNotificationService implements NotificationService {
+    public void send(String recipient, String message) {
+        // send via email
+    }
+}
+
+@Service("smsNotification")
+public class SmsNotificationService implements NotificationService {
+    public void send(String recipient, String message) {
+        // send via SMS
+    }
+}
+
+// Consumer depends on the interface — not the implementation
+@Service
+public class OrderService {
+    private final NotificationService notificationService;
+
+    public OrderService(NotificationService notificationService) {
+        this.notificationService = notificationService;
+    }
+
+    public void placeOrder(Order order) {
+        // ... business logic ...
+        notificationService.send(order.getEmail(), "Order confirmed!");
+        // doesn't know or care if this is email, SMS, or push
+    }
+}
+```
+
+In Spring, you swap the implementation by changing which bean is injected (via `@Qualifier` or `@Primary`) — the `OrderService` code doesn't change at all. This is the **Open/Closed Principle**: open for extension (new `NotificationService` implementation), closed for modification (no changes to `OrderService`).
+
+This pattern also makes testing trivial — inject a mock implementation of the interface in unit tests, no real email sent.
+
+---
+
+**Q: Can an interface extend another interface? Can a class implement multiple interfaces that have the same default method?**
+
+Yes — interfaces can extend other interfaces (and multiple at once):
+
+```java
+public interface Readable { String read(); }
+public interface Writable { void write(String data); }
+public interface ReadWritable extends Readable, Writable { }  // inherits both contracts
+
+class FileHandler implements ReadWritable {
+    public String read() { return "data"; }
+    public void write(String data) { /* write */ }
+}
+```
+
+**Diamond problem with default methods:** if two interfaces provide a `default` method with the same signature, the implementing class gets a compile error and must override to resolve the conflict:
+
+```java
+interface A { default void greet() { System.out.println("Hello from A"); } }
+interface B { default void greet() { System.out.println("Hello from B"); } }
+
+class C implements A, B {
+    @Override
+    public void greet() {
+        A.super.greet();   // explicitly choose A's version, or write your own
+    }
+}
+```
+
+---
+
 ## 2. Multithreading
 
 **Q: What is multithreading?**
