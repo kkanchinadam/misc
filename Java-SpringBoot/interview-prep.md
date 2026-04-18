@@ -375,6 +375,102 @@ Field injection is fine for quick prototypes or test classes (`@MockBean` in tes
 
 ---
 
+**Q: What is the difference between letting Spring inject a dependency (`@Autowired`) vs creating one with `new`?**
+
+This is one of the most important things to understand about Spring.
+
+When you write `new SomeService()`, you are creating an object **outside of the Spring container**. Spring has no knowledge of this object — it was never registered as a bean, never passed through the application context, and its lifecycle is entirely yours to manage.
+
+The critical consequence: **any `@Autowired` fields or constructor dependencies inside that manually created object will NOT be injected**. Spring only wires dependencies into objects it creates and manages.
+
+```java
+@Service
+public class PaymentService {
+    @Autowired
+    private TransactionRepository transactionRepo;  // Spring injects this normally
+
+    public void process() {
+        // transactionRepo is available — Spring created this bean
+    }
+}
+
+@Service
+public class OrderService {
+    public void placeOrder() {
+        // WRONG — creating PaymentService manually
+        PaymentService ps = new PaymentService();
+        ps.process();
+        // ps.transactionRepo is NULL — Spring never touched this object
+        // This will throw NullPointerException when process() tries to use transactionRepo
+    }
+}
+```
+
+**Why is this?**
+
+Spring's dependency injection works through a **proxy and post-processing mechanism**. When Spring creates a bean, it:
+1. Instantiates the object.
+2. Runs `BeanPostProcessor` logic to scan for `@Autowired`, `@Value`, etc.
+3. Injects the dependencies.
+4. Returns the fully wired object (often a proxy, especially for `@Transactional`).
+
+When you call `new`, you skip all of that. You get a plain Java object with no Spring processing applied — `@Autowired` annotations are just metadata sitting there doing nothing.
+
+**The same problem applies to other Spring features:**
+
+Not just `@Autowired` — any Spring annotation on the manually created object is silently ignored:
+
+```java
+@Service
+public class ReportService {
+    @Autowired
+    private DataSource dataSource;      // ignored — Spring didn't create this
+
+    @Transactional                      // ignored — no Spring proxy
+    public void generateReport() {
+        // dataSource is NULL — NullPointerException
+        // @Transactional has no effect — no transaction will be opened
+    }
+}
+
+// Somewhere else — the wrong way
+ReportService rs = new ReportService();   // completely bypasses Spring
+rs.generateReport();                      // crash or silent wrong behavior
+```
+
+**The right way — always get beans from Spring:**
+
+```java
+@Service
+public class OrderService {
+    private final PaymentService paymentService;   // Spring-managed
+
+    // Spring injects a fully wired PaymentService here
+    public OrderService(PaymentService paymentService) {
+        this.paymentService = paymentService;
+    }
+
+    public void placeOrder() {
+        paymentService.process();   // transactionRepo is wired, @Transactional works
+    }
+}
+```
+
+**Summary — `@Autowired` (Spring-managed) vs `new` (manually created):**
+
+| | Spring-managed (`@Autowired`) | Manually created (`new`) |
+|---|---|---|
+| Spring aware | Yes | No |
+| Dependencies injected | Yes | No — all `@Autowired` fields are `null` |
+| `@Transactional` works | Yes (Spring wraps with proxy) | No — annotation is ignored |
+| `@Value` properties injected | Yes | No |
+| Singleton scope enforced | Yes | No — new instance every time |
+| Lifecycle hooks (`@PostConstruct`) | Called | Not called |
+
+**The rule:** never instantiate a Spring component with `new` in application code. If you need an object that has dependencies, make it a bean and inject it. If you need a fresh instance per use (not a singleton), use `@Scope("prototype")` and inject the provider, or use `ApplicationContext.getBean()` — but the object must still be created by Spring.
+
+---
+
 ## 5. Spring Boot
 
 **Q: What is Spring Boot?**
