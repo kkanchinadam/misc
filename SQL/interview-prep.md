@@ -1,5 +1,17 @@
 # SQL — Interview Prep
 
+## Table of Contents
+- [1. Core SQL Statements](#1-core-sql-statements)
+- [2. Filtering, Sorting & Aggregation](#2-filtering-sorting--aggregation)
+- [3. JOINs](#3-joins)
+- [4. Subqueries & CTEs](#4-subqueries--ctes)
+- [5. Window Functions](#5-window-functions)
+- [6. Indexes](#6-indexes)
+- [7. Constraints & Keys](#7-constraints--keys)
+- [8. Normalization](#8-normalization)
+- [9. Transactions & ACID](#9-transactions--acid)
+- [10. Performance & Query Optimization](#10-performance--query-optimization)
+
 ---
 
 ## 1. Core SQL Statements

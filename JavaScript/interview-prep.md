@@ -1,5 +1,17 @@
 # JavaScript — Interview Prep
 
+## Table of Contents
+- [1. Types & Type Coercion](#1-types--type-coercion)
+- [2. Scope, Closures & Hoisting](#2-scope-closures--hoisting)
+- [3. `this` Keyword](#3-this-keyword)
+- [4. Prototypes & Inheritance](#4-prototypes--inheritance)
+- [5. Async JavaScript](#5-async-javascript)
+- [6. Functions & Execution](#6-functions--execution)
+- [7. Objects & Arrays](#7-objects--arrays)
+- [8. ES6+ Features](#8-es6-features)
+- [9. Modules](#9-modules)
+- [10. Common Gotchas & Thought-Provoking Questions](#10-common-gotchas--thought-provoking-questions)
+
 ---
 
 ## 1. Types & Type Coercion

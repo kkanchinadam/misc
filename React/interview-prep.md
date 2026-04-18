@@ -1,5 +1,14 @@
 # React — Interview Prep
 
+## Table of Contents
+- [1. Core Concepts](#1-core-concepts)
+- [2. Components](#2-components)
+- [3. Hooks](#3-hooks)
+- [4. Re-renders & Performance](#4-re-renders--performance)
+- [5. State Management](#5-state-management)
+- [6. Lifecycle & Patterns](#6-lifecycle--patterns)
+- [7. Thought-Provoking Questions](#7-thought-provoking-questions)
+
 ---
 
 ## 1. Core Concepts

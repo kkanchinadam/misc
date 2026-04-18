@@ -1,5 +1,14 @@
 # Java & Spring Boot — Interview Prep
 
+## Table of Contents
+- [1. OOP Concepts](#1-oop-concepts)
+- [2. Multithreading](#2-multithreading)
+- [3. Design Patterns](#3-design-patterns)
+- [4. Dependency Injection & Autowiring](#4-dependency-injection--autowiring)
+- [5. Spring Boot](#5-spring-boot)
+- [6. REST APIs](#6-rest-apis)
+- [7. Data Structures](#7-data-structures)
+
 ---
 
 ## 1. OOP Concepts
@@ -874,3 +883,393 @@ header.payload.signature
 6. Token expires after a set time (`exp` claim); client must re-authenticate or use a refresh token.
 
 **Key point:** JWTs are **stateless** — the server doesn't store session state. This is why they scale well in distributed systems. The trade-off is that tokens cannot be invalidated before expiry without extra infrastructure (a token blacklist).
+
+---
+
+## 7. Data Structures
+
+**Q: What is an Array and when do you use it?**
+
+An array is a fixed-size, contiguous block of memory holding elements of the same type. Size is set at creation and cannot change.
+
+```java
+int[] nums = new int[5];
+int[] primes = {2, 3, 5, 7, 11};
+
+primes[0];       // O(1) — direct index access
+primes[2] = 99;  // O(1) — direct write
+```
+
+| Operation | Time Complexity |
+|---|---|
+| Access by index | O(1) |
+| Search (unsorted) | O(n) |
+| Insert / Delete (middle) | O(n) — must shift elements |
+
+**Use an array when:**
+- Size is known and fixed upfront.
+- You need maximum memory efficiency (no overhead per element).
+- You're doing index-heavy access patterns (e.g., lookup tables, matrix math).
+
+In practice, `ArrayList` is used far more often in Java because it's dynamic.
+
+---
+
+**Q: What is a List? `ArrayList` vs `LinkedList` — which should you use?**
+
+`List` is an ordered, index-accessible collection that allows duplicates. The two main implementations have very different internal structures.
+
+**`ArrayList`** — backed by a resizable array. Elements stored contiguously in memory.
+
+**`LinkedList`** — backed by a doubly-linked list. Each element (node) holds a value and pointers to the previous and next node.
+
+| Operation | ArrayList | LinkedList |
+|---|---|---|
+| Access by index (`get(i)`) | O(1) | O(n) — must traverse |
+| Add/remove at end | O(1) amortized | O(1) |
+| Add/remove at beginning/middle | O(n) — shifts elements | O(1) — just relink pointers |
+| Memory | Less (contiguous array) | More (two pointers per node) |
+| Cache performance | Excellent (contiguous) | Poor (scattered in heap) |
+
+**Default choice: `ArrayList`.** It wins in the vast majority of use cases because index access is fast and cache locality makes iteration faster than it looks on paper. `LinkedList` is theoretically better for frequent insertions at the head, but its cache-unfriendly memory layout usually makes `ArrayList` faster even then. Use `LinkedList` only when you have profiled and confirmed it's better, or when you specifically need the `Deque` interface.
+
+```java
+List<String> list = new ArrayList<>();   // almost always this
+list.add("Alice");
+list.add("Bob");
+list.get(0);        // "Alice" — O(1)
+list.remove(0);     // shifts remaining elements
+```
+
+---
+
+**Q: Array vs List — deep comparison. When do you actually reach for one over the other?**
+
+This is one of those questions where the short answer ("use List, it's dynamic") hides important nuance.
+
+**Memory and type differences**
+
+A `int[]` stores raw primitive integers packed tightly in memory — no object overhead, no boxing. An `ArrayList<Integer>` stores references to `Integer` objects on the heap — each element is a boxed object with its own header (~16 bytes) plus the reference itself (4–8 bytes). For a million integers:
+
+- `int[]` → ~4 MB
+- `ArrayList<Integer>` → ~20+ MB + GC pressure
+
+This matters in performance-critical or memory-constrained code.
+
+```java
+int[] primitiveArray = new int[1_000_000];        // ~4 MB, zero boxing
+List<Integer> boxedList = new ArrayList<>(1_000_000); // ~20+ MB, every element a heap object
+```
+
+**Resizability**
+
+Arrays are fixed-size — you declare the size at creation and it never changes. If you need more room, you allocate a new larger array and copy everything over (which is exactly what `ArrayList` does internally when it grows).
+
+`ArrayList` starts with a default capacity of 10 and doubles when full. You can pre-size it to avoid repeated resizing:
+
+```java
+// If you know you'll have ~500 elements, pre-size to avoid 5-6 resize operations
+List<String> names = new ArrayList<>(500);
+```
+
+**Multi-dimensional data**
+
+Arrays are natural for matrices and grids. A `int[][]` is a true 2D structure. Doing the same with nested lists is verbose and slower:
+
+```java
+// Clean and efficient
+int[][] matrix = new int[3][3];
+matrix[1][2] = 42;
+
+// Verbose with lists
+List<List<Integer>> matrix = new ArrayList<>();
+```
+
+**Type safety and covariance — a tricky difference**
+
+Arrays are **covariant** — `String[]` is a subtype of `Object[]`. This can cause runtime errors:
+
+```java
+String[] strings = new String[3];
+Object[] objects = strings;       // compiles fine — covariant
+objects[0] = 42;                  // compiles fine — then throws ArrayStoreException at runtime
+
+// Generics are invariant — this fails at compile time (safer)
+List<String> strList = new ArrayList<>();
+List<Object> objList = strList;   // compile error — caught early
+```
+
+**API richness**
+
+`List` (and the Collections API generally) comes with a huge toolkit: `Collections.sort()`, `Collections.shuffle()`, `stream()`, `forEach()`, `removeIf()`, `subList()`. Arrays need `Arrays.sort()`, `Arrays.stream()`, and manual loops for most operations. In practice, the Collections API makes `List` dramatically more ergonomic.
+
+```java
+List<String> names = new ArrayList<>(List.of("Charlie", "Alice", "Bob"));
+Collections.sort(names);
+names.removeIf(n -> n.startsWith("C"));
+names.stream().map(String::toUpperCase).forEach(System.out::println);
+```
+
+**Null handling**
+
+Both `int[]` and `ArrayList` have gotchas:
+
+```java
+int[] arr = new int[5];   // all elements default to 0
+String[] sarr = new String[5]; // all elements default to null — NullPointerException if not set
+
+List<String> list = new ArrayList<>();
+list.get(0);  // IndexOutOfBoundsException — list is empty, not null-filled
+```
+
+**Decision guide — array vs list:**
+
+| Situation | Use |
+|---|---|
+| Size is fixed and known | Array — simpler, less overhead |
+| Primitive types, performance-critical, large dataset | Array — no boxing, better memory |
+| Multi-dimensional grid / matrix | `int[][]` array |
+| Size changes dynamically | `ArrayList` |
+| Need Collections API (`sort`, `stream`, `removeIf`) | `ArrayList` |
+| Passing to legacy or low-level APIs | May require array — `toArray()` converts |
+| General purpose, everyday code | `ArrayList` — default choice |
+
+**Converting between them:**
+
+```java
+// Array → List (fixed-size view, no add/remove)
+String[] arr = {"a", "b", "c"};
+List<String> fixed = Arrays.asList(arr);       // backed by array — no structural changes
+List<String> mutable = new ArrayList<>(Arrays.asList(arr));  // fully mutable copy
+
+// List → Array
+String[] back = list.toArray(new String[0]);   // pass typed array
+
+// Primitive array → stream
+int[] nums = {1, 2, 3};
+IntStream stream = Arrays.stream(nums);
+int sum = Arrays.stream(nums).sum();
+```
+
+---
+
+**Q: What is a Stack and when do you use it?**
+
+A Stack is a **Last-In, First-Out (LIFO)** structure — the last element pushed is the first one popped. Think of a stack of plates.
+
+In Java, avoid the legacy `Stack` class (extends `Vector`, thread-synchronized, slow). Use `ArrayDeque` instead:
+
+```java
+Deque<Integer> stack = new ArrayDeque<>();
+
+stack.push(1);    // [1]
+stack.push(2);    // [2, 1]
+stack.push(3);    // [3, 2, 1]
+
+stack.peek();     // 3  — look at top without removing
+stack.pop();      // 3  — removes and returns top → [2, 1]
+```
+
+| Operation | Time Complexity |
+|---|---|
+| push / pop / peek | O(1) |
+
+**Use a Stack when:**
+- You need to reverse something (push all, then pop all).
+- Tracking "undo" history — each action is pushed; undo pops the last.
+- Parsing balanced brackets / expressions — push opens, pop on close.
+- DFS (depth-first search) — either explicit stack or recursion (call stack).
+- Backtracking algorithms.
+
+---
+
+**Q: What is a Queue and when do you use it?**
+
+A Queue is a **First-In, First-Out (FIFO)** structure — elements are added at the back and removed from the front. Think of a line at a checkout.
+
+In Java, use `ArrayDeque` for a plain queue, or `LinkedList` when you need the `Queue` interface explicitly:
+
+```java
+Queue<String> queue = new ArrayDeque<>();
+
+queue.offer("Alice");   // enqueue — ["Alice"]
+queue.offer("Bob");     // ["Alice", "Bob"]
+queue.offer("Carol");   // ["Alice", "Bob", "Carol"]
+
+queue.peek();    // "Alice" — front without removing
+queue.poll();    // "Alice" — removes and returns front → ["Bob", "Carol"]
+```
+
+| Operation | Time Complexity |
+|---|---|
+| offer (enqueue) / poll (dequeue) / peek | O(1) |
+
+**Use a Queue when:**
+- Processing tasks in the order they arrived (job queues, request buffers).
+- BFS (breadth-first search) — process level by level.
+- Rate limiting — hold requests in a queue.
+- Producer-consumer patterns (`BlockingQueue` variants in `java.util.concurrent`).
+
+**`PriorityQueue`** — a special queue where each element has a priority and the element with the highest priority (smallest by default) is dequeued first. Backed by a min-heap. Useful for scheduling and Dijkstra's algorithm.
+
+```java
+PriorityQueue<Integer> pq = new PriorityQueue<>();
+pq.offer(5); pq.offer(1); pq.offer(3);
+pq.poll();  // 1 — smallest first
+```
+
+**`ArrayDeque` as both Stack and Queue:** `ArrayDeque` implements both `Stack` and `Queue` operations efficiently. It's the recommended replacement for both `Stack` and `LinkedList` as a queue.
+
+---
+
+**Q: What is a Tree? What is a Binary Search Tree?**
+
+A **tree** is a hierarchical data structure with a root node, where each node has zero or more child nodes. No cycles — each node has exactly one parent (except the root).
+
+A **Binary Search Tree (BST)** is a binary tree (max 2 children per node) where:
+- Left subtree contains only values **less than** the node.
+- Right subtree contains only values **greater than** the node.
+
+```
+       8
+      / \
+     3   10
+    / \    \
+   1   6    14
+      / \
+     4   7
+```
+
+| Operation | Average (balanced) | Worst (skewed) |
+|---|---|---|
+| Search | O(log n) | O(n) |
+| Insert | O(log n) | O(n) |
+| Delete | O(log n) | O(n) |
+
+A skewed BST (e.g., inserting already-sorted data) degrades to a linked list. **Balanced BST variants** (AVL tree, Red-Black tree) self-balance to guarantee O(log n). Java's `TreeMap` and `TreeSet` are backed by a Red-Black tree.
+
+**Common tree types and uses:**
+
+| Tree Type | Used in |
+|---|---|
+| Binary Search Tree | Ordered data, range queries |
+| Red-Black Tree | `TreeMap`, `TreeSet` in Java |
+| Heap (complete binary tree) | `PriorityQueue` — O(1) max/min access |
+| Trie (prefix tree) | Autocomplete, spell check |
+| B-Tree / B+ Tree | Database indexes, filesystems |
+
+**When to use a tree:**
+- You need **sorted order** plus O(log n) search/insert/delete (`TreeMap`, `TreeSet`).
+- You need range queries (find all keys between A and B).
+- Hierarchical data (file systems, org charts, XML/JSON parsing).
+
+---
+
+**Q: What is a HashMap? How does it work internally?**
+
+A `HashMap` stores **key-value pairs** with O(1) average-case get and put. Internally, it uses an array of "buckets." The key's `hashCode()` determines which bucket the entry goes into.
+
+```java
+Map<String, Integer> scores = new HashMap<>();
+scores.put("Alice", 95);
+scores.put("Bob", 87);
+
+scores.get("Alice");           // 95 — O(1) average
+scores.containsKey("Carol");   // false
+scores.getOrDefault("Carol", 0); // 0
+
+// Iterate entries
+for (Map.Entry<String, Integer> entry : scores.entrySet()) {
+    System.out.println(entry.getKey() + ": " + entry.getValue());
+}
+```
+
+**How it works internally:**
+1. `key.hashCode()` → hashed → maps to a bucket index.
+2. If the bucket is empty → store the entry there.
+3. If the bucket is occupied (**hash collision**) → entries are stored in a linked list (or a balanced tree in Java 8+ when the list gets long).
+4. On `get`, hash the key, find the bucket, then check `equals()` to find the exact entry.
+
+This is why **both `hashCode()` and `equals()` must be implemented correctly** on keys. Two keys that are `equals()` must have the same `hashCode()`. If you override `equals()` without overriding `hashCode()`, lookups will break.
+
+**Key `Map` implementations:**
+
+| | `HashMap` | `LinkedHashMap` | `TreeMap` |
+|---|---|---|---|
+| Order | None | Insertion order | Sorted by key |
+| Performance | O(1) avg | O(1) avg | O(log n) |
+| Use when | Fast lookup, order irrelevant | Need insertion order (LRU cache) | Need sorted keys or range queries |
+
+---
+
+**Q: What is a Set? `HashSet` vs `TreeSet` vs `LinkedHashSet`?**
+
+A `Set` is a collection of **unique elements** — no duplicates allowed. Adding a duplicate is silently ignored.
+
+```java
+Set<String> set = new HashSet<>();
+set.add("apple");
+set.add("banana");
+set.add("apple");   // duplicate — ignored
+set.size();         // 2
+
+set.contains("banana");  // true — O(1)
+```
+
+| | `HashSet` | `LinkedHashSet` | `TreeSet` |
+|---|---|---|---|
+| Backed by | `HashMap` | `LinkedHashMap` | `TreeMap` (Red-Black tree) |
+| Order | None | Insertion order | Sorted (natural or `Comparator`) |
+| `contains` / `add` / `remove` | O(1) avg | O(1) avg | O(log n) |
+| Use when | Fast membership test, order irrelevant | Unique + insertion order | Unique + sorted order |
+
+---
+
+**Q: Set vs List — when do you use one over the other?**
+
+| | `List` | `Set` |
+|---|---|---|
+| Duplicates | Allowed | Not allowed |
+| Order | Insertion order maintained | Depends on implementation |
+| Access by index | Yes — `get(i)` | No |
+| `contains()` performance | O(n) for `ArrayList` | O(1) for `HashSet` |
+| Use when | Order matters, duplicates valid, index access needed | Uniqueness required, fast membership test |
+
+**Choose `List` when:**
+- You care about order or position.
+- Duplicates are valid (e.g., a shopping cart with two of the same item).
+- You need index-based access.
+
+**Choose `Set` when:**
+- You need to eliminate duplicates (e.g., unique visitors, distinct tags).
+- You need to check membership frequently and performance matters (`contains` is O(1) vs O(n)).
+- You're computing set operations: union (`addAll`), intersection (`retainAll`), difference (`removeAll`).
+
+```java
+// Fast deduplication
+List<String> withDupes = List.of("a", "b", "a", "c", "b");
+Set<String> unique = new HashSet<>(withDupes);   // {"a", "b", "c"}
+
+// Fast membership test — prefer Set over List
+Set<String> validRoles = Set.of("ADMIN", "USER", "MODERATOR");
+if (validRoles.contains(userRole)) { ... }   // O(1)
+// vs List.contains() → O(n) — iterates every element
+```
+
+---
+
+**Q: Quick reference — which data structure should I reach for?**
+
+| Need | Use |
+|---|---|
+| Ordered list, index access, duplicates OK | `ArrayList` |
+| Fast lookup by key | `HashMap` |
+| Unique elements, fast membership test | `HashSet` |
+| Sorted unique elements | `TreeSet` |
+| Sorted key-value map | `TreeMap` |
+| Preserve insertion order, unique | `LinkedHashSet` |
+| LIFO (undo, parsing, DFS) | `ArrayDeque` as stack |
+| FIFO (task queue, BFS) | `ArrayDeque` as queue |
+| Priority ordering (scheduling) | `PriorityQueue` |
+| Thread-safe key-value map | `ConcurrentHashMap` |
+| Hierarchical / sorted with range queries | `TreeMap` / `TreeSet` |

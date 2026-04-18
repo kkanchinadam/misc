@@ -1,5 +1,17 @@
 # Python — Interview Prep
 
+## Table of Contents
+- [1. Python Basics](#1-python-basics)
+- [2. Functions & Scope](#2-functions--scope)
+- [3. OOP in Python](#3-oop-in-python)
+- [4. Iterators, Generators & Comprehensions](#4-iterators-generators--comprehensions)
+- [5. Decorators](#5-decorators)
+- [6. Error Handling](#6-error-handling)
+- [7. Modules & Packages](#7-modules--packages)
+- [8. Common Standard Library & Built-ins](#8-common-standard-library--built-ins)
+- [9. Concurrency](#9-concurrency)
+- [10. Pythonic Code](#10-pythonic-code)
+
 ---
 
 ## 1. Python Basics

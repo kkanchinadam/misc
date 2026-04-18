@@ -1,5 +1,18 @@
 # Angular — Interview Prep
 
+## Table of Contents
+- [1. Angular Overview](#1-angular-overview)
+- [2. Components](#2-components)
+- [3. Data Binding](#3-data-binding)
+- [4. Directives](#4-directives)
+- [5. Services & Dependency Injection](#5-services--dependency-injection)
+- [6. Pipes](#6-pipes)
+- [7. RxJS & Observables](#7-rxjs--observables)
+- [8. Forms](#8-forms)
+- [9. Change Detection](#9-change-detection)
+- [10. Routing & Lazy Loading](#10-routing--lazy-loading)
+- [11. Thought-Provoking Questions](#11-thought-provoking-questions)
+
 ---
 
 ## 1. Angular Overview
