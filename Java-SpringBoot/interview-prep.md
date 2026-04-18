@@ -8,6 +8,7 @@
 - [5. Spring Boot](#5-spring-boot)
 - [6. REST APIs](#6-rest-apis)
 - [7. Data Structures](#7-data-structures)
+- [8. JUnit & Testing](#8-junit--testing)
 
 ---
 
@@ -1273,3 +1274,303 @@ if (validRoles.contains(userRole)) { ... }   // O(1)
 | Priority ordering (scheduling) | `PriorityQueue` |
 | Thread-safe key-value map | `ConcurrentHashMap` |
 | Hierarchical / sorted with range queries | `TreeMap` / `TreeSet` |
+
+---
+
+## 8. JUnit & Testing
+
+**Q: What is JUnit and why is testing important?**
+
+JUnit is the standard unit testing framework for Java. A **unit test** verifies a single unit of code (usually one method or class) in isolation — fast, deterministic, no external dependencies like databases or network calls.
+
+Testing matters because:
+- **Catches regressions** — a change that breaks existing behaviour fails immediately, not in production.
+- **Documents intent** — a test shows exactly what a method is supposed to do.
+- **Enables confident refactoring** — if all tests pass after a change, behaviour is preserved.
+- **Forces good design** — code that is hard to test is usually tightly coupled or has too many responsibilities.
+
+JUnit 5 (Jupiter) is the current version. It ships as three modules: `junit-jupiter-api` (annotations/assertions), `junit-jupiter-engine` (runs tests), `junit-jupiter-params` (parameterised tests).
+
+---
+
+**Q: What are the core JUnit 5 annotations?**
+
+| Annotation | Purpose |
+|---|---|
+| `@Test` | Marks a method as a test case |
+| `@BeforeEach` | Runs before every test method — set up fresh state |
+| `@AfterEach` | Runs after every test method — clean up |
+| `@BeforeAll` | Runs once before all tests in the class — must be `static` |
+| `@AfterAll` | Runs once after all tests — must be `static` |
+| `@DisplayName` | Human-readable test name shown in reports |
+| `@Disabled` | Skip a test (with a reason) |
+| `@Nested` | Group related tests in an inner class |
+| `@ParameterizedTest` | Run the same test with multiple inputs |
+| `@ValueSource` | Supply primitive/string values to a parameterised test |
+| `@MethodSource` | Supply values from a factory method |
+| `@ExtendWith` | Register extensions (e.g., Mockito, Spring) |
+
+```java
+@DisplayName("OrderService tests")
+class OrderServiceTest {
+
+    private OrderService orderService;
+
+    @BeforeEach
+    void setUp() {
+        orderService = new OrderService();   // fresh instance before each test
+    }
+
+    @Test
+    @DisplayName("should calculate total correctly")
+    void shouldCalculateTotal() {
+        double total = orderService.calculateTotal(List.of(10.0, 20.0, 5.0));
+        assertEquals(35.0, total);
+    }
+
+    @Test
+    @Disabled("price calculation not implemented yet")
+    void shouldApplyDiscount() { }
+}
+```
+
+---
+
+**Q: What are the main JUnit 5 assertions?**
+
+Assertions are in `org.junit.jupiter.api.Assertions`. If an assertion fails, the test fails with a clear message.
+
+```java
+assertEquals(expected, actual);
+assertEquals(3.14, result, 0.001);         // with delta for floating point
+assertNotEquals(unexpected, actual);
+
+assertTrue(condition);
+assertFalse(condition);
+
+assertNull(object);
+assertNotNull(object);
+
+assertThrows(IllegalArgumentException.class, () -> service.method(null));
+
+assertAll(                                 // run all assertions even if some fail
+    () -> assertEquals("Alice", user.getName()),
+    () -> assertEquals(30, user.getAge()),
+    () -> assertNotNull(user.getEmail())
+);
+
+// Custom failure message (message first in JUnit 5)
+assertEquals(5, list.size(), "List should contain 5 elements after add");
+```
+
+**`assertThrows` — testing expected exceptions:**
+```java
+@Test
+void shouldThrowWhenAmountIsNegative() {
+    IllegalArgumentException ex = assertThrows(
+        IllegalArgumentException.class,
+        () -> paymentService.process(-50)
+    );
+    assertTrue(ex.getMessage().contains("negative"));
+}
+```
+
+---
+
+**Q: What is Mockito and why is it used alongside JUnit?**
+
+Mockito is a mocking framework. When unit testing a class that depends on other classes (like a Service that calls a Repository), you don't want the real dependencies — they'd hit a database, make HTTP calls, etc. Mockito lets you create **fakes (mocks)** that you control.
+
+```java
+@ExtendWith(MockitoExtension.class)          // activates Mockito in JUnit 5
+class UserServiceTest {
+
+    @Mock
+    private UserRepository userRepository;   // Mockito creates a fake implementation
+
+    @InjectMocks
+    private UserService userService;         // injects the mock into this
+
+    @Test
+    void shouldReturnUserById() {
+        User fakeUser = new User(1L, "Alice");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(fakeUser));
+
+        User result = userService.getUser(1L);
+
+        assertEquals("Alice", result.getName());
+        verify(userRepository).findById(1L);  // assert the method was actually called
+    }
+
+    @Test
+    void shouldThrowWhenUserNotFound() {
+        when(userRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(UserNotFoundException.class, () -> userService.getUser(99L));
+    }
+}
+```
+
+**Key Mockito concepts:**
+
+| Concept | Description |
+|---|---|
+| `@Mock` | Creates a mock object (all methods return defaults unless stubbed) |
+| `@InjectMocks` | Creates the class under test and injects `@Mock` fields into it |
+| `@Spy` | Wraps a real object — real methods run unless you stub them |
+| `@Captor` | Captures arguments passed to a mock for assertion |
+| `when(...).thenReturn(...)` | Stub — define what a mock returns when called |
+| `when(...).thenThrow(...)` | Stub a method to throw an exception |
+| `verify(mock).method(args)` | Assert the method was called with those arguments |
+| `verify(mock, times(2)).method()` | Assert called exactly twice |
+| `verify(mock, never()).method()` | Assert never called |
+| `ArgumentMatchers.any()` | Match any argument: `when(repo.findById(any()))` |
+
+---
+
+**Q: What is the difference between a mock, a stub, a spy, and a fake?**
+
+These terms are often used loosely but have distinct meanings:
+
+- **Mock** — a fully fake object. All methods return defaults (null, 0, false) unless you stub them. You typically verify that certain methods were called. Created by `@Mock`.
+- **Stub** — a fake that returns predetermined responses. Focus is on controlling input/output, not on verifying calls. In Mockito, `when(...).thenReturn(...)` turns a mock into a stub for that method.
+- **Spy** — wraps a real object. Real methods run unless you stub specific ones. Useful when you want most real behaviour but need to control one or two methods. Created by `@Spy`.
+- **Fake** — a lightweight working implementation of a dependency (e.g., an in-memory repository instead of a real DB). Written by hand, not generated by Mockito.
+
+```java
+// Spy — real ArrayList, but we can stub/verify specific calls
+@Spy
+List<String> spyList = new ArrayList<>();
+
+@Test
+void spyExample() {
+    spyList.add("Alice");          // real add — actually adds to the list
+    spyList.add("Bob");
+
+    assertEquals(2, spyList.size());  // real size
+
+    doReturn(100).when(spyList).size();  // now stub size()
+    assertEquals(100, spyList.size());   // returns stubbed value
+}
+```
+
+---
+
+**Q: How do you test a Spring Boot application? What is `@SpringBootTest` vs slice tests?**
+
+Spring Boot provides testing support that integrates with JUnit 5. There are two broad strategies:
+
+**Full integration test — `@SpringBootTest`:**
+Loads the complete Spring application context. Slow but tests real wiring.
+
+```java
+@SpringBootTest
+@AutoConfigureMockMvc
+class UserControllerIntegrationTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Test
+    void shouldReturnUser() throws Exception {
+        mockMvc.perform(get("/api/users/1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.name").value("Alice"));
+    }
+}
+```
+
+**Slice tests — test only one layer:**
+Much faster — loads only the beans relevant to that slice.
+
+| Annotation | What it loads | Use for |
+|---|---|---|
+| `@WebMvcTest(Controller.class)` | Web layer only (Controller, filters, security) | Testing controller logic, request mapping, validation |
+| `@DataJpaTest` | JPA layer only (repositories, in-memory H2 DB) | Testing repository queries |
+| `@JsonTest` | JSON serialization/deserialization only | Testing `@JsonComponent`, ObjectMapper config |
+| `@MockBean` | Adds a Mockito mock to the Spring context | Replace a real bean with a mock in slice tests |
+
+```java
+@WebMvcTest(UserController.class)
+class UserControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
+    private UserService userService;           // mock the service — don't load real one
+
+    @Test
+    void shouldReturn404WhenUserNotFound() throws Exception {
+        when(userService.getUser(99L)).thenThrow(new UserNotFoundException("not found"));
+
+        mockMvc.perform(get("/api/users/99"))
+            .andExpect(status().isNotFound());
+    }
+}
+```
+
+---
+
+**Q: What makes a good unit test? What is the AAA pattern?**
+
+**AAA — Arrange, Act, Assert** is the standard structure for a readable test:
+
+```java
+@Test
+void shouldApplyDiscountForPremiumUsers() {
+    // Arrange — set up inputs and dependencies
+    User premiumUser = new User("Alice", UserType.PREMIUM);
+    PricingService pricingService = new PricingService();
+
+    // Act — call the method under test
+    double discountedPrice = pricingService.getPrice(100.0, premiumUser);
+
+    // Assert — verify the outcome
+    assertEquals(80.0, discountedPrice, "Premium users should get 20% discount");
+}
+```
+
+**Characteristics of a good unit test (FIRST):**
+- **Fast** — runs in milliseconds. No I/O, no network, no database.
+- **Isolated** — tests one thing. Fails only when that one thing is broken.
+- **Repeatable** — same result every time, regardless of order or environment.
+- **Self-validating** — pass or fail without manual inspection of output.
+- **Timely** — written alongside or before the code (TDD), not long after.
+
+**What to avoid:**
+- Multiple unrelated assertions in one test (hard to diagnose which failed).
+- Tests that depend on execution order.
+- Logic in tests (if/else, loops) — tests should be dumb and obvious.
+- Testing implementation details — test *what* a method does, not *how*.
+- Ignoring edge cases: null inputs, empty collections, boundary values (0, -1, max).
+
+---
+
+**Q: What is Test-Driven Development (TDD)?**
+
+TDD is a development practice where you write the test **before** writing the implementation. The cycle is:
+
+1. **Red** — write a test for behaviour that doesn't exist yet. It fails.
+2. **Green** — write the minimum code to make the test pass.
+3. **Refactor** — clean up the code while keeping the tests green.
+
+```java
+// Step 1 — Red: write the test first
+@Test
+void shouldReturnFizzForMultiplesOfThree() {
+    assertEquals("Fizz", FizzBuzz.evaluate(3));   // FizzBuzz class doesn't exist yet
+}
+
+// Step 2 — Green: write just enough to pass
+class FizzBuzz {
+    static String evaluate(int n) {
+        if (n % 3 == 0) return "Fizz";
+        return String.valueOf(n);
+    }
+}
+
+// Step 3 — Refactor: add more cases, keep tests green
+```
+
+**Benefits:** forces you to think about the interface before the implementation, guarantees all code has test coverage, produces a test suite that documents every requirement.
